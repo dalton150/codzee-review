@@ -1,0 +1,38 @@
+
+{
+  "name": "codzee-review",
+  "version": "1.0.0",
+  "description": "A modular Node.js API for evaluating automated code review quality",
+  "main": "src/app.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand",
+    "test:watch": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --watch",
+    "test:coverage": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --coverage --runInBand"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dalton150/codzee-review.git"
+  },
+  "keywords": [
+    "nodejs",
+    "express",
+    "backend",
+    "api",
+    "code-review"
+  ],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/dalton150/codzee-review/issues"
+  },
+  "homepage": "https://github.com/dalton150/codzee-review#readme",
+  "dependencies": {
+    "express": "^5.3.0"
+  },
+  "devDependencies": {
+    "jest": "^30.5.2",
+    "supertest": "^7.3.1"
+  }
+}
