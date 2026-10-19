@@ -7,9 +7,7 @@ import {
 } from '../services/taskService.js';
 
 function getOwnerId(req) {
-    //  Temporary identity for this assignment's API prototype.
-    // Replace with authenticated identity before production use.
-    return req.get('x-user-id');
+    return req.user.id;
 }
 
 export function createTaskController(req, res, next) {

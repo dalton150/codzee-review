@@ -27,4 +27,17 @@ describe('Error handling', () => {
         expect(response.body.error.message).not.toMatch(/stack|SyntaxError/i);
     });
 
+    it('preserves the 413 status for oversized JSON requests', async () => {
+        const oversizedPayload = {
+            title: 'Valid task title',
+            padding: 'x'.repeat(110 * 1024),
+        };
+
+        const response = await request(app)
+            .post('/api/tasks')
+            .send(oversizedPayload);
+
+        expect(response.status).toBe(413);
+        expect(response.body.error).toBeDefined();
+    });
 });

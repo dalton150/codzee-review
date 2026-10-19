@@ -8,6 +8,7 @@ import {
 } from '../controllers/taskController.js';
 
 import validate from '../middleware/validate.js';
+import authenticate from '../middleware/authenticate.js';
 
 import {
   createTaskSchema,
@@ -16,6 +17,8 @@ import {
 } from '../validators/taskValidator.js';
 
 const router = Router();
+
+router.use(authenticate);
 
 router.post('/',validate(createTaskSchema),createTaskController);
 router.get('/',validate(listTasksQuerySchema,'query'),listTasksController);

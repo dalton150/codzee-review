@@ -4,14 +4,7 @@ const errorHandler = (err, req, res, next) => {
     return next(err);
   }
 
-  const isClientError =
-    err.status === 400 ||
-    err.status === 401 ||
-    err.status === 403 ||
-    err.status === 404 ||
-    err.status === 409 ||
-    err.status === 422 ||
-    err.status === 429;
+  const isClientError = Number.isInteger(err.status) && err.status >= 400 && err.status < 500;
 
   const isMalformedJson =
     err.type === 'entity.parse.failed' && err.status === 400;
