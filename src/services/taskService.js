@@ -1,0 +1,138 @@
+import { randomUUID } from 'node:crypto';
+
+const tasks = new Map();
+
+const allowedTransitions = {
+    pending: ['in_progress', 'completed'],
+    in_progress: ['pending','completed'],
+    completed: [],
+};
+
+export class TaskServiceError extends Error {
+    constructor(message, status, code) {
+        super(message);
+        this.name = 'TaskServiceError';
+        this.status = status;
+        this.code = code;
+        this.expose = true;
+    }
+}
+
+function assertOwnerId(ownerId) {
+    if(typeof ownerId !== 'string' || ownerId.trim() === '') {
+        throw new TaskServiceError(
+            'A valid owner identity is required',
+            401,
+            'UNAUTHENTICATED'
+        );
+    }
+}
+
+function findOwnedTask(id, ownerId) {
+    const task = tasks.get(id);
+
+    if(!task || task.ownerId !== ownerId) {
+        throw new TaskServiceError(
+            'Task not found',
+            404,
+            'TASK_NOT_FOUND',
+        );
+    }
+
+    return task;
+}
+
+
+export function createTask(ownerId,input) {
+    assertOwnerId(ownerId);
+    const now = new Date().toISOString();
+
+    const task = {
+        id: randomUUID(),
+        ownerId,
+        title: input.title,
+        description:input.description ?? '',
+        status:'pending',
+        createdAt: now,
+        updatedAt: now,
+    };
+
+    tasks.set(task.id,task);
+    return {...task};
+}
+
+
+export function listTasks(ownerId, { page = 1, limit = 20 } = {}) {
+  assertOwnerId(ownerId);
+
+  const matchingTasks = [...tasks.values()]
+    .filter((task) => task.ownerId === ownerId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  const start = (page - 1) * limit;
+
+  return {
+    items: matchingTasks.slice(start, start + limit).map((task) => ({ ...task })),
+    pagination: {
+      page,
+      limit,
+      totalItems: matchingTasks.length,
+      totalPages: Math.ceil(matchingTasks.length / limit),
+    },
+  };
+}
+
+
+export function getTask(id,ownerId){
+    assertOwnerId(ownerId);
+    return {...findOwnedTask(id,ownerId)};
+}
+
+
+export function updateTask(id, ownerId, input) {
+    assertOwnerId(ownerId);
+
+    const existing = findOwnedTask(id, ownerId);
+
+    const allowedFields = ['title', 'description', 'status'];
+    const unexpectedFields = Object.keys(input).filter(
+        (key) => !allowedFields.includes(key),
+    );
+
+    if (unexpectedFields.length > 0) {
+        throw new TaskServiceError(
+        'Update contains unsupported fields',
+        400,
+        'UNSUPPORTED_UPDATE_FIELDS',
+        );
+    }
+
+    if (
+            input.status &&
+            input.status !== existing.status &&
+            !allowedTransitions[existing.status].includes(input.status)
+        ) {
+            throw new TaskServiceError(
+            `Cannot transition task from ${existing.status} to ${input.status}`,
+            409,
+            'INVALID_STATUS_TRANSITION',
+            );
+        }
+
+    const updated = {
+        ...existing,
+        ...input,
+        updatedAt: new Date().toISOString(),
+    };
+
+    tasks.set(id, updated);
+
+    return { ...updated };
+}
+
+
+export function deleteTask(id,ownerId){
+    assertOwnerId(ownerId);
+    findOwnedTask(id, ownerId);
+    tasks.delete(id);
+}
