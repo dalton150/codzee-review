@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 const authenticate = (req, res, next) => {
     const authorization = req.get('authorization');
 
-    if (!authorization || !authorization.startsWith('Bearer ')){
+    if (!authorization || !/^Bearer\s+\S+$/i.test(authorization)) {
         return res.status(401).json({
             error: {
                 code: 'UNAUTHENTICATED',
@@ -12,7 +12,7 @@ const authenticate = (req, res, next) => {
         });
     }
 
-    const token = authorization.slice('Bearer '.length).trim();
+    const token = authorization.replace(/^Bearer\s+/i, '').trim();
     const secret = process.env.JWT_SECRET;
 
     if(!secret){

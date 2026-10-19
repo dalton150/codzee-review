@@ -63,6 +63,31 @@ describe('Authentication middleware', () => {
         expect(res.status).not.toHaveBeenCalled();
     });
 
+    it('accepts the Bearer scheme in lowercase', () => {
+        process.env.JWT_SECRET = TEST_SECRET;
+
+        const token = jwt.sign(
+            { sub: 'user-lowercase' },
+            TEST_SECRET,
+            { algorithm: 'HS256', expiresIn: '5m' },
+        );
+
+        const req = {
+            get: () => `bearer ${token}`,
+        };
+        const res = {
+            status: jestStatusMock(),
+            json: jestJsonMock(),
+        };
+        const next = jestNextMock();
+
+        authenticate(req, res, next);
+
+        expect(req.user).toEqual({ id: 'user-lowercase' });
+        expect(next).toHaveBeenCalledTimes(1);
+        expect(res.status).not.toHaveBeenCalled();
+    });
+
     it('rejects a token signed with the wrong secret', () => {
         process.env.JWT_SECRET = TEST_SECRET;
 
@@ -84,6 +109,13 @@ describe('Authentication middleware', () => {
         authenticate(req, res, next);
 
         expect(res.status).toHaveBeenCalledWith(401);
+        expect(res.json).toHaveBeenCalledWith({
+            error: {
+                code: 'INVALID_TOKEN',
+                message: 'The authentication token is invalid or expired',
+            },
+        });
+        expect(req.user).toBeUndefined();
         expect(next).not.toHaveBeenCalled();
     });
 
