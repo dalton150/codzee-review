@@ -194,6 +194,93 @@ describe('Task API integration', () => {
     });
   });
 
+  it.each([
+    ['zero page', 'page=0'],
+    ['negative page', 'page=-1'],
+    ['decimal page', 'page=1.5'],
+    ['non-numeric page', 'page=abc'],
+    ['zero limit', 'limit=0'],
+    ['negative limit', 'limit=-1'],
+    ['decimal limit', 'limit=1.5'],
+    ['limit above maximum', 'limit=101'],
+    ['non-numeric limit', 'limit=abc'],
+    ['unknown query parameter', 'unexpected=true'],
+  ])('rejects invalid pagination query: %s', async (_description, query) => {
+    const response = await request(app)
+      .get(`/api/tasks?${query}`)
+      .set('Authorization', `Bearer ${tokenFor(ownerId())}`);
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    expect(response.body.error.details.length).toBeGreaterThan(0);
+  });
+
+  it('uses default pagination values when query parameters are omitted', async () => {
+    const owner = ownerId();
+
+    const response = await request(app)
+      .get('/api/tasks')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.pagination).toMatchObject({
+      page: 1,
+      limit: 20,
+      totalItems: 0,
+      totalPages: 0,
+    });
+    expect(response.body.data.items).toEqual([]);
+  });
+
+    it('returns pagination metadata for a valid second page', async () => {
+    const owner = ownerId();
+
+    await request(app)
+      .post('/api/tasks')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({ title: 'First pagination task' });
+
+    await request(app)
+      .post('/api/tasks')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({ title: 'Second pagination task' });
+
+    const response = await request(app)
+      .get('/api/tasks?page=2&limit=1')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.items).toHaveLength(1);
+    expect(response.body.data.pagination).toMatchObject({
+      page: 2,
+      limit: 1,
+      totalItems: 2,
+      totalPages: 2,
+    });
+  });
+
+  it('returns an empty result for a page beyond the available results', async () => {
+    const owner = ownerId();
+
+    await request(app)
+      .post('/api/tasks')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({ title: 'Only pagination task' });
+
+    const response = await request(app)
+      .get('/api/tasks?page=2&limit=1')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.items).toEqual([]);
+    expect(response.body.data.pagination).toMatchObject({
+      page: 2,
+      limit: 1,
+      totalItems: 1,
+      totalPages: 1,
+    });
+  });
+
   it('rejects client-supplied identity without a Bearer token', async () => {
     const response = await request(app)
       .post('/api/tasks')
