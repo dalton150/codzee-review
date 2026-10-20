@@ -194,6 +194,127 @@ describe('Task API integration', () => {
     });
   });
 
+  it.each([
+    ['zero page', 'page=0', 'page'],
+    ['negative page', 'page=-1', 'page'],
+    ['decimal page', 'page=1.5', 'page'],
+    ['non-numeric page', 'page=abc', 'page'],
+    ['zero limit', 'limit=0', 'limit'],
+    ['negative limit', 'limit=-1', 'limit'],
+    ['decimal limit', 'limit=1.5', 'limit'],
+    ['limit above maximum', 'limit=101', 'limit'],
+    ['non-numeric limit', 'limit=abc', 'limit'],
+    ['unknown query parameter', 'unexpected=true', 'unexpected'],
+  ])(
+    'rejects invalid pagination query: %s',
+    async (_description, query, expectedField) => {
+      const response = await request(app)
+        .get(`/api/tasks?${query}`)
+        .set('Authorization', `Bearer ${tokenFor(ownerId())}`);
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+      expect(
+        response.body.error.details.some(
+          (detail) => detail.field === expectedField,
+        ),
+      ).toBe(true);
+    },
+  );
+
+  it.each([
+    ['minimum limit', 'page=1&limit=1', 1],
+    ['maximum limit', 'page=1&limit=100', 100],
+  ])(
+    'accepts the %s boundary',
+    async (_description, query, expectedLimit) => {
+      const response = await request(app)
+        .get(`/api/tasks?${query}`)
+        .set('Authorization', `Bearer ${tokenFor(ownerId())}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.pagination).toMatchObject({
+        page: 1,
+        limit: expectedLimit,
+      });
+    },
+  );
+
+  it('uses default pagination values and slices results when parameters are omitted', async () => {
+    const owner = ownerId();
+
+    for (let index = 1; index <= 21; index += 1) {
+      const created = await request(app)
+        .post('/api/tasks')
+        .set('Authorization', `Bearer ${tokenFor(owner)}`)
+        .send({ title: `Default pagination task ${index}` });
+
+      expect(created.status).toBe(201);
+    }
+
+    const response = await request(app)
+      .get('/api/tasks')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.items).toHaveLength(20);
+    expect(response.body.data.pagination).toMatchObject({
+      page: 1,
+      limit: 20,
+      totalItems: 21,
+      totalPages: 2,
+    });
+  });
+
+  it('returns pagination metadata for a valid second page', async () => {
+    const owner = ownerId();
+
+    await request(app)
+      .post('/api/tasks')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({ title: 'First pagination task' });
+
+    await request(app)
+      .post('/api/tasks')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({ title: 'Second pagination task' });
+
+    const response = await request(app)
+      .get('/api/tasks?page=2&limit=1')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.items).toHaveLength(1);
+    expect(response.body.data.pagination).toMatchObject({
+      page: 2,
+      limit: 1,
+      totalItems: 2,
+      totalPages: 2,
+    });
+  });
+
+  it('returns an empty result for a page beyond the available results', async () => {
+    const owner = ownerId();
+
+    await request(app)
+      .post('/api/tasks')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`)
+      .send({ title: 'Only pagination task' });
+
+    const response = await request(app)
+      .get('/api/tasks?page=2&limit=1')
+      .set('Authorization', `Bearer ${tokenFor(owner)}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.items).toEqual([]);
+    expect(response.body.data.pagination).toMatchObject({
+      page: 2,
+      limit: 1,
+      totalItems: 1,
+      totalPages: 1,
+    });
+  });
+
   it('rejects client-supplied identity without a Bearer token', async () => {
     const response = await request(app)
       .post('/api/tasks')
