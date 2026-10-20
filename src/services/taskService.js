@@ -28,6 +28,74 @@ function assertOwnerId(ownerId) {
     }
 }
 
+function validateTaskUpdate(input) {
+    if (
+        !input ||
+        typeof input !== 'object' ||
+        Array.isArray(input) ||
+        Object.keys(input).length === 0
+    ) {
+        throw new TaskServiceError(
+            'Update must contain at least one valid field',
+            400,
+            'INVALID_TASK_UPDATE',
+        );
+    }
+
+    const allowedFields = ['title', 'description', 'status'];
+    const unexpectedFields = Object.keys(input).filter(
+        (key) => !allowedFields.includes(key),
+    );
+
+    if (unexpectedFields.length > 0) {
+        throw new TaskServiceError(
+            'Update contains unsupported fields',
+            400,
+            'UNSUPPORTED_UPDATE_FIELDS',
+        );
+    }
+
+    if (
+        Object.hasOwn(input, 'title') &&
+        (
+            typeof input.title !== 'string' ||
+            input.title.trim().length < 3 ||
+            input.title.trim().length > 120
+        )
+    ) {
+        throw new TaskServiceError(
+            'Title must be between 3 and 120 characters',
+            400,
+            'INVALID_TASK_TITLE',
+        );
+    }
+
+    if (
+        Object.hasOwn(input, 'description') &&
+        (
+            typeof input.description !== 'string' ||
+            input.description.length > 2000
+        )
+    ) {
+        throw new TaskServiceError(
+            'Description must be a string of at most 2000 characters',
+            400,
+            'INVALID_TASK_DESCRIPTION',
+        );
+    }
+
+    if (
+        Object.hasOwn(input, 'status') &&
+        !Object.hasOwn(allowedTransitions, input.status)
+    ) {
+        throw new TaskServiceError(
+            'Invalid task status',
+            400,
+            'INVALID_TASK_STATUS',
+        );
+    }
+}
+
 function findOwnedTask(id, ownerId) {
     const task = tasks.get(id);
 
@@ -94,30 +162,19 @@ export function updateTask(id, ownerId, input) {
 
     const existing = findOwnedTask(id, ownerId);
 
-    const allowedFields = ['title', 'description', 'status'];
-    const unexpectedFields = Object.keys(input).filter(
-        (key) => !allowedFields.includes(key),
-    );
-
-    if (unexpectedFields.length > 0) {
-        throw new TaskServiceError(
-        'Update contains unsupported fields',
-        400,
-        'UNSUPPORTED_UPDATE_FIELDS',
-        );
-    }
+    validateTaskUpdate(input);
 
     if (
-            input.status &&
-            input.status !== existing.status &&
-            !allowedTransitions[existing.status].includes(input.status)
-        ) {
-            throw new TaskServiceError(
+        input.status &&
+        input.status !== existing.status &&
+        !allowedTransitions[existing.status].includes(input.status)
+    ) {
+        throw new TaskServiceError(
             `Cannot transition task from ${existing.status} to ${input.status}`,
             409,
             'INVALID_STATUS_TRANSITION',
-            );
-        }
+        );
+    }
 
     const updated = {
         ...existing,

@@ -95,4 +95,41 @@ describe('Task service',() => {
         expect(getTask(task.id, 'user-1').ownerId).toBe('user-1');
     });
 
+    it.each([
+        ['empty update', {}],
+        ['blank title', { title: '   ' }],
+        ['title shorter than minimum', { title: 'ab' }],
+        ['title longer than maximum', { title: 'a'.repeat(121) }],
+        ['non-string title', { title: 123 }],
+        ['non-string description', { description: 123 }],
+        ['description longer than maximum', { description: 'a'.repeat(2001) }],
+        ['unsupported status', { status: 'archived' }],
+    ])('rejects an invalid service update: %s', (_description, input) => {
+        const original = getTask(task.id, 'user-1');
+
+        expect(() => updateTask(task.id, 'user-1', input)).toThrow(
+            TaskServiceError,
+        );
+
+        expect(getTask(task.id, 'user-1')).toEqual(original);
+    });
+
+    it('rejects null update input without changing the task', () => {
+        const original = getTask(task.id, 'user-1');
+
+        expect(() => updateTask(task.id, 'user-1', null)).toThrow(
+            TaskServiceError,
+        );
+
+        expect(getTask(task.id, 'user-1')).toEqual(original);
+    });
+
+    it('accepts a valid title update', () => {
+        const updated = updateTask(task.id, 'user-1', {
+            title: 'Updated task title',
+        });
+
+        expect(updated.title).toBe('Updated task title');
+        expect(getTask(task.id, 'user-1').title).toBe('Updated task title');
+    });
 });
