@@ -55,38 +55,45 @@ function validateTaskUpdate(input) {
         );
     }
 
-    if (
-        Object.hasOwn(input, 'title') &&
-        (
+    const normalized = { ...input };
+
+    if (Object.hasOwn(input, 'title')) {
+        if (
             typeof input.title !== 'string' ||
             input.title.trim().length < 3 ||
             input.title.trim().length > 120
-        )
-    ) {
-        throw new TaskServiceError(
-            'Title must be between 3 and 120 characters',
-            400,
-            'INVALID_TASK_TITLE',
-        );
+        ) {
+            throw new TaskServiceError(
+                'Title must be between 3 and 120 characters',
+                400,
+                'INVALID_TASK_TITLE',
+            );
+        }
+
+        normalized.title = input.title.trim();
     }
 
-    if (
-        Object.hasOwn(input, 'description') &&
-        (
+    if (Object.hasOwn(input, 'description')) {
+        if (
             typeof input.description !== 'string' ||
-            input.description.length > 2000
-        )
-    ) {
-        throw new TaskServiceError(
-            'Description must be a string of at most 2000 characters',
-            400,
-            'INVALID_TASK_DESCRIPTION',
-        );
+            input.description.trim().length > 2000
+        ) {
+            throw new TaskServiceError(
+                'Description must be a string of at most 2000 characters',
+                400,
+                'INVALID_TASK_DESCRIPTION',
+            );
+        }
+
+        normalized.description = input.description.trim();
     }
 
     if (
         Object.hasOwn(input, 'status') &&
-        !Object.hasOwn(allowedTransitions, input.status)
+        (
+            typeof input.status !== 'string' ||
+            !Object.hasOwn(allowedTransitions, input.status)
+        )
     ) {
         throw new TaskServiceError(
             'Invalid task status',
@@ -94,6 +101,8 @@ function validateTaskUpdate(input) {
             'INVALID_TASK_STATUS',
         );
     }
+
+    return normalized;
 }
 
 function findOwnedTask(id, ownerId) {
@@ -162,15 +171,15 @@ export function updateTask(id, ownerId, input) {
 
     const existing = findOwnedTask(id, ownerId);
 
-    validateTaskUpdate(input);
+    const validatedInput = validateTaskUpdate(input);
 
     if (
-        input.status &&
-        input.status !== existing.status &&
-        !allowedTransitions[existing.status].includes(input.status)
+        validatedInput.status &&
+        validatedInput.status !== existing.status &&
+        !allowedTransitions[existing.status].includes(validatedInput.status)
     ) {
         throw new TaskServiceError(
-            `Cannot transition task from ${existing.status} to ${input.status}`,
+            `Cannot transition task from ${existing.status} to ${validatedInput.status}`,
             409,
             'INVALID_STATUS_TRANSITION',
         );
@@ -178,7 +187,7 @@ export function updateTask(id, ownerId, input) {
 
     const updated = {
         ...existing,
-        ...input,
+        ...validatedInput,
         updatedAt: new Date().toISOString(),
     };
 
